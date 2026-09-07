@@ -1,0 +1,56 @@
+name: Compile Android Bypass .so
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # Allows you to tap a manual button on your mobile phone browser
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository code
+      uses: actions/checkout@v4
+
+    - name: Generate Inline Android.mk Configurations
+      run: |
+        cat << 'EOF' > Android.mk
+        LOCAL_PATH := $(call my-dir)
+
+        include $(CLEAR_VARS)
+
+        LOCAL_MODULE    := king
+        LOCAL_SRC_FILES := king.cpp
+
+        # Enable aggressive performance optimization (-O3) and hide symbols
+        LOCAL_CFLAGS    := -O3 -fvisibility=hidden -std=c++17
+        LOCAL_LDLIBS    := -llog -landroid
+
+        include $(BUILD_SHARED_LIBRARY)
+        EOF
+
+    - name: Generate Inline Application.mk Configurations
+      run: |
+        cat << 'EOF' > Application.mk
+        APP_ABI := arm64-v8a
+        APP_PLATFORM := android-21
+        APP_STL := c++_static
+        EOF
+
+    - name: Set up official Android NDK
+      uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r25c # Highly stable NDK target release environment
+
+    - name: Execute Cloud Compilation
+      run: |
+        ndk-build NDK_PROJECT_PATH=. APP_BUILD_SCRIPT=./Android.mk NDK_APPLICATION_MK=./Application.mk
+
+    - name: Upload Finished Compiled Library
+      uses: actions/upload-artifact@v4
+      with:
+        name: libking-64bit
+        path: libs/arm64-v8a/libking.so
+        
